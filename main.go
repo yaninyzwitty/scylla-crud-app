@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/table"
 	"github.com/yaninyzwitty/scylla-go-app/configuration"
 	"github.com/yaninyzwitty/scylla-go-app/controller"
 	"github.com/yaninyzwitty/scylla-go-app/database"
@@ -25,16 +23,6 @@ type Person struct {
 	Name string     `json:"name"`
 	Age  int        `json:"age"`
 }
-
-var personMetadata = table.Metadata{
-	Name:    "persons",
-	Columns: []string{"id", "name", "age"},
-	PartKey: []string{"id"},
-}
-
-var session gocqlx.Session
-
-var personTable = table.New(personMetadata)
 
 func main() {
 	cfg, err := configuration.NewConfig()
