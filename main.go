@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/gocql/gocql"
 	"github.com/yaninyzwitty/scylla-go-app/configuration"
 	"github.com/yaninyzwitty/scylla-go-app/controller"
 	"github.com/yaninyzwitty/scylla-go-app/database"
@@ -17,12 +16,6 @@ import (
 	"github.com/yaninyzwitty/scylla-go-app/router"
 	"github.com/yaninyzwitty/scylla-go-app/service"
 )
-
-type Person struct {
-	ID   gocql.UUID `json:"id"`
-	Name string     `json:"name"`
-	Age  int        `json:"age"`
-}
 
 func main() {
 	cfg, err := configuration.NewConfig()
