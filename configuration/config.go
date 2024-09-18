@@ -12,7 +12,8 @@ type Config struct {
 }
 
 func NewConfig() (*Config, error) {
-	err := godotenv.Load()
+	// err := godotenv.Load("./.env")  //testing without fallback
+	err := godotenv.Load() //with fallback
 	if err != nil {
 		return nil, err
 	}

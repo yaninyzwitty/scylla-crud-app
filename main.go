@@ -71,38 +71,3 @@ func main() {
 	slog.Info("Server shutdown successful")
 
 }
-
-// check this if it will work properly
-// func updatePerson(w http.ResponseWriter, r *http.Request) {
-// 	idStr := r.URL.Query().Get("id")
-// 	if idStr == "" {
-// 		http.Error(w, "ID is required", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	id, err := gocql.ParseUUID(idStr)
-// 	if err != nil {
-// 		http.Error(w, "Invalid UUID format", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	var person Person
-// 	if err := json.NewDecoder(r.Body).Decode(&person); err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	// Construct the update query
-// 	query := qb.Update(personTable.Name()).
-// 		Set("name", "age").
-// 		Where(qb.Eq("id")).Query(session)
-
-// 	// Bind values and execute
-// 	err = query.BindMap(qb.M{"id": id, "name": person.Name, "age": person.Age}).ExecRelease()
-// 	if err != nil {
-// 		http.Error(w, "Failed to update the person", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	responseToJson(w, http.StatusOK, person)
-// }
