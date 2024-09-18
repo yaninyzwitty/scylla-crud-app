@@ -12,6 +12,7 @@ import (
 	"github.com/scylladb/gocqlx/v3/qb"
 	"github.com/scylladb/gocqlx/v3/table"
 	"github.com/yaninyzwitty/scylla-go-app/configuration"
+	"github.com/yaninyzwitty/scylla-go-app/controller"
 	"github.com/yaninyzwitty/scylla-go-app/database"
 	"github.com/yaninyzwitty/scylla-go-app/repository"
 	"github.com/yaninyzwitty/scylla-go-app/service"
@@ -48,6 +49,7 @@ func main() {
 
 	songsRepo := repository.NewSongsRepository(session)
 	songsService := service.NewSongsService(songsRepo)
+	songsController := controller.NewController(songsService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /songs", createSong)        // POST /songs
