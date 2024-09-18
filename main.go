@@ -1,20 +1,22 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/gocql/gocql"
 	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/qb"
 	"github.com/scylladb/gocqlx/v3/table"
 	"github.com/yaninyzwitty/scylla-go-app/configuration"
 	"github.com/yaninyzwitty/scylla-go-app/controller"
 	"github.com/yaninyzwitty/scylla-go-app/database"
 	"github.com/yaninyzwitty/scylla-go-app/repository"
+	"github.com/yaninyzwitty/scylla-go-app/router"
 	"github.com/yaninyzwitty/scylla-go-app/service"
 )
 
@@ -51,136 +53,41 @@ func main() {
 	songsService := service.NewSongsService(songsRepo)
 	songsController := controller.NewController(songsService)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /songs", createSong)        // POST /songs
-	mux.HandleFunc("GET /songs/{id}", getSong)       // GET /song/{id}
-	mux.HandleFunc("PUT /songs/{id}", updateSong)    // PUT /song/{id}
-	mux.HandleFunc("DELETE /songs/{id}", deleteSong) // DELETE /song/{id}
+	r := router.NewRouter(songsController)
 
-	log.Println("Server is running on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", mux))
-}
-
-func createSong(w http.ResponseWriter, r *http.Request) {
-	var song Person
-	if err := json.NewDecoder(r.Body).Decode(&song); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	song.ID = gocql.TimeUUID()
-
-	query := qb.Insert(personTable.Name()).Columns(personTable.Metadata().Columns...).Query(session)
-	err := query.BindStruct(song).ExecRelease()
-	if err != nil {
-		http.Error(w, "Failed to insert the song", http.StatusInternalServerError)
-		return
-	}
-	// json.NewEncoder(w).Encode(song)
-	responseToJson(w, http.StatusOK, song)
-
-}
-
-func getSong(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-
-	if idStr == "" {
-		http.Error(w, "ID is required", http.StatusBadRequest)
-		return
-	}
-	id, err := gocql.ParseUUID(idStr)
-	if err != nil {
-		http.Error(w, "Invalid UUID format!", http.StatusBadRequest)
-		return
+	// Create HTTP server
+	server := &http.Server{
+		Addr:    ":" + cfg.PORT,
+		Handler: r,
 	}
 
-	query := qb.Select(personTable.Name()).Where(qb.Eq("id")).Query(session)
-	query.BindMap(qb.M{"id": id})
+	// Start server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("Failed to start server: %v", err)
+		}
+	}()
 
-	var song Person
-	err = query.GetRelease(&song)
-	if err != nil {
-		http.Error(w, "Song not found", http.StatusNotFound)
-		return
+	// Server is running
+	slog.Info(fmt.Sprintf("Server is running on port: %s", cfg.PORT))
+
+	// Set up OS signal handling for graceful shutdown
+	quitCH := make(chan os.Signal, 1)
+	signal.Notify(quitCH, os.Interrupt)
+
+	// Block until signal is received
+	<-quitCH
+	slog.Info("Received termination signal, shutting down server...")
+
+	// Create context for shutdown timeouts
+	shutdownCTX, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := server.Shutdown(shutdownCTX); err != nil {
+		slog.Error("Failed to gracefully shut down server: %v", err)
 	}
-	responseToJson(w, http.StatusOK, song)
-	// json.NewEncoder(w).Encode(song)
-	// use this instead
-}
-
-func updateSong(w http.ResponseWriter, r *http.Request) {
-	// Extract ID from the URL path
-	idStr := r.PathValue("id")
-	fmt.Println(idStr)
-
-	if idStr == "" {
-		http.Error(w, "ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// Parse the UUID from the ID string
-	id, err := gocql.ParseUUID(idStr)
-	if err != nil {
-		http.Error(w, "Invalid UUID format!", http.StatusBadRequest)
-		return
-	}
-
-	// Decode the request body to get the song data
-	var song Person
-	if err := json.NewDecoder(r.Body).Decode(&song); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Set the ID of the song to the parsed ID
-	song.ID = id
-
-	// Build the update query
-	query := qb.Update(personTable.Name()).Set("name", "age").Where(qb.Eq("id")).Query(session) //write manually dont copy all cols...
-
-	// Bind the song struct to the query
-	err = query.BindStruct(song).ExecRelease()
-	if err != nil {
-		http.Error(w, "Failed to update the song", http.StatusInternalServerError)
-		return
-	}
-
-	// Return the updated song as JSON
-	responseToJson(w, http.StatusOK, song)
-}
-
-func deleteSong(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-
-	if idStr == "" {
-		http.Error(w, "Missing id parameter", http.StatusBadRequest)
-		return
-	}
-	id, err := gocql.ParseUUID(idStr)
-	if err != nil {
-		http.Error(w, "Invalid UUID format!", http.StatusBadRequest)
-		return
-	}
-
-	query := qb.Delete(personTable.Name()).Where(qb.Eq("id")).Query(session)
-	err = query.BindMap(qb.M{"id": id}).ExecRelease()
-	if err != nil {
-		http.Error(w, "Failed to delete the song", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func responseToJson(w http.ResponseWriter, statusCode int, data interface{}) {
-	response, err := json.Marshal(data)
-	if err != nil {
-		http.Error(w, "Error encoding JSON response", http.StatusInternalServerError)
-		return
-
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	w.Write(response)
+	slog.Info("Server shutdown successful")
 
 }
 

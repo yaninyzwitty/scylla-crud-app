@@ -19,6 +19,7 @@ func NewRouter(controller *controller.Controller) *http.ServeMux {
 	middlewareChain := middleware.ChainMiddlewares(
 		LoggingMiddleware,
 		corsMiddleware,
+		// add other middlewares here...
 	)
 
 	// Define routes and wrap them with the middleware stack
